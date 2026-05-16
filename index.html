@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MM2 Elite Trade Calculator</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+
+        :root {
+            --bg: #050505;
+            --accent: #00ff88;
+            --red: #ff3e3e;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            background-image: radial-gradient(circle at 50% 0%, #1a1a2e 0%, #050505 100%);
+            color: white; margin: 0; padding-bottom: 250px; /* Ruang untuk kalkulator di bawah */
+        }
+
+        /* HEADER */
+        .header { text-align: center; padding: 30px 10px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
+        h1 { margin: 0; font-weight: 800; letter-spacing: 3px; color: var(--accent); }
+        #searchInput {
+            width: 80%; max-width: 400px; padding: 12px 20px; margin-top: 15px;
+            border-radius: 25px; border: 1px solid var(--border); background: #111; color: white;
+        }
+
+        /* GRID ITEM */
+        .item-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 12px; padding: 20px; max-width: 1000px; margin: 0 auto;
+        }
+        .item-card {
+            background: var(--glass); border: 1px solid var(--border); border-radius: 15px;
+            padding: 10px; text-align: center; cursor: pointer; transition: 0.2s;
+        }
+        .item-card:hover { transform: scale(1.05); background: rgba(255,255,255,0.1); }
+        .item-card img { width: 60px; height: 60px; object-fit: contain; }
+        .item-name { display: block; font-size: 10px; height: 25px; color: #bbb; }
+        .item-val { display: block; font-weight: bold; color: var(--accent); }
+
+        /* MODAL PILIH SIDE */
+        #sideModal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #111; padding: 20px; border-radius: 20px; border: 2px solid var(--accent);
+            z-index: 2000; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        .btn-side { padding: 10px 20px; margin: 5px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .btn-you { background: var(--accent); color: black; }
+        .btn-them { background: var(--red); color: white; }
+
+        /* CALCULATOR BAR (FIXED DI BAWAH) */
+        .calc-container {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 2px solid var(--border);
+            display: grid; grid-template-columns: 1fr 0.5fr 1fr;
+            padding: 15px; z-index: 1000; height: 180px;
+        }
+
+        .side-box { overflow-y: auto; text-align: center; padding: 5px; }
+        .side-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+        .total-val { font-size: 20px; font-weight: 800; color: var(--accent); }
+        .them-val { color: var(--red); }
+
+        .vs-box { display: flex; flex-direction: column; align-items: center; justify-content: center; border-left: 1px solid #333; border-right: 1px solid #333; }
+        .status-badge { font-size: 12px; padding: 5px 10px; border-radius: 5px; margin-top: 5px; font-weight: bold; }
+        .win { background: var(--accent); color: black; }
+        .loss { background: var(--red); color: white; }
+        .fair { background: #555; color: white; }
+
+        .selected-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+        .mini-item { width: 35px; height: 35px; background: #222; border-radius: 5px; position: relative; cursor: pointer; }
+        .mini-item img { width: 100%; height: 100%; object-fit: contain; }
+        
+        button#resetBtn { background: none; border: 1px solid #444; color: #888; font-size: 10px; cursor: pointer; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>MM2 CALC</h1>
+        <input type="text" id="searchInput" placeholder="Cari item..." onkeyup="filterItems()">
+    </div>
+
+    <div class="item-grid" id="itemGrid"></div>
+
+    <!-- Modal Pilihan -->
+    <div id="sideModal">
+        <p id="modalItemName"></p>
+        <button class="btn-side btn-you" onclick="addToSide('you')">Side Kamu</button>
+        <button class="btn-side btn-them" onclick="addToSide('them')">Side Lawan</button>
+        <br><button onclick="closeModal()" style="background:none; border:none; color:grey; margin-top:10px; cursor:pointer;">Batal</button>
+    </div>
+
+    <!-- Kalkulator Bar -->
+    <div class="calc-container">
+        <!-- Side Kamu -->
+        <div class="side-box">
+            <div class="side-title">SIDE KAMU</div>
+            <div class="total-val" id="totalYou">0</div>
+            <div class="selected-list" id="listYou"></div>
+        </div>
+
+        <!-- VS & Status -->
+        <div class="vs-box">
+            <div style="font-weight: 800; font-size: 18px;">VS</div>
+            <div id="statusBadge" class="status-badge fair">FAIR</div>
+            <button id="resetBtn" onclick="resetTrade()">RESET</button>
+        </div>
+
+        <!-- Side Lawan -->
+        <div class="side-box">
+            <div class="side-title">SIDE LAWAN</div>
+            <div class="total-val them-val" id="totalThem">0</div>
+            <div class="selected-list" id="listThem"></div>
+        </div>
+    </div>
+
+    <script>
+        const items = [
+            { n: "Harvester", v: 3500, r: "ancient", img: "" },
+            { n: "Icepiercer", v: 3200, r: "ancient", img: "" },
+            { n: "Bat", v: 2800, r: "ancient", img: "" },
+            { n: "Evergun", v: 4500, r: "godly", img: "" },
+            { n: "Candy", v: 160, r: "godly", img: "" },
+            { n: "Sugar", v: 155, r: "godly", img: "" },
+            { n: "Heartblade", v: 75, r: "godly", img: "" },
+            { n: "Luger", v: 80, r: "godly", img: "" },
+            { n: "Darksword", v: 650, r: "godly", img: "" },
+            { n: "Ocean", v: 350, r: "godly", img: "" }
+            // Tambahkan item lainnya di sini...
+        ];
+
+        let trade = { you: [], them: [] };
+        let selectedItem = null;
+
+        function displayItems(data) {
+            const grid = document.getElementById('itemGrid');
+            grid.innerHTML = "";
+            data.forEach((item, index) => {
+                grid.innerHTML += `
+                    <div class="item-card" onclick="openModal(${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                        <img src="${item.img || 'https://via.placeholder.com/60?text=MM2'}" alt="${item.n}">
+                        <span class="item-name">${item.n}</span>
+                        <span class="item-val">${item.v}</span>
+                    </div>
+                `;
+            });
+        }
+
+        function openModal(item) {
+            selectedItem = item;
+            document.getElementById('modalItemName').innerText = "Tambah " + item.n + " ke?";
+            document.getElementById('sideModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('sideModal').style.display = 'none';
+        }
+
+        function addToSide(side) {
+            trade[side].push(selectedItem);
+            updateCalc();
+            closeModal();
+        }
+
+        function updateCalc() {
+            let valYou = 0;
+            let valThem = 0;
+            
+            const listYou = document.getElementById('listYou');
+            const listThem = document.getElementById('listThem');
+            
+            listYou.innerHTML = "";
+            listThem.innerHTML = "";
+
+            trade.you.forEach((item, idx) => {
+                valYou += item.v;
+                listYou.innerHTML += `<div class="mini-item" onclick="removeItem('you', ${idx})"><img src="${item.img || 'https://via.placeholder.com/35'}"></div>`;
+            });
+
+            trade.them.forEach((item, idx) => {
+                valThem += item.v;
+                listThem.innerHTML += `<div class="mini-item" onclick="removeItem('them', ${idx})"><img src="${item.img || 'https://via.placeholder.com/35'}"></div>`;
+            });
+
+            document.getElementById('totalYou').innerText = valYou.toLocaleString();
+            document.getElementById('totalThem').innerText = valThem.toLocaleString();
+
+            // Status Badge Logic
+            const badge = document.getElementById('statusBadge');
+            if (valYou === 0 && valThem === 0) {
+                badge.innerText = "EMPTY"; badge.className = "status-badge fair";
+            } else if (valYou > valThem) {
+                badge.innerText = "L (Sultan)"; badge.className = "status-badge loss";
+            } else if (valThem > valYou) {
+                badge.innerText = "W (Profit)"; badge.className = "status-badge win";
+            } else {
+                badge.innerText = "FAIR"; badge.className = "status-badge fair";
+            }
+        }
+
+        function removeItem(side, index) {
+            trade[side].splice(index, 1);
+            updateCalc();
+        }
+
+        function resetTrade() {
+            trade = { you: [], them: [] };
+            updateCalc();
+        }
+
+        function filterItems() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = items.filter(i => i.n.toLowerCase().includes(query));
+            displayItems(filtered);
+        }
+
+        displayItems(items);
+    </script>
+</body>
+</html>
